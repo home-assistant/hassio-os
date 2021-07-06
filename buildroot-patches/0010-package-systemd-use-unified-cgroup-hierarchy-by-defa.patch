@@ -1,0 +1,33 @@
+From b67f5b74e63fa26456249d889842461402167d68 Mon Sep 17 00:00:00 2001
+Message-Id: <b67f5b74e63fa26456249d889842461402167d68.1618503866.git.stefan@agner.ch>
+In-Reply-To: <9c98c07abbe9ee675ec588ad7c15f0285e8a0f07.1618503866.git.stefan@agner.ch>
+References: <9c98c07abbe9ee675ec588ad7c15f0285e8a0f07.1618503866.git.stefan@agner.ch>
+From: Stefan Agner <stefan@agner.ch>
+Date: Thu, 15 Apr 2021 18:23:36 +0200
+Subject: [PATCH 10/10] package/systemd: use unified cgroup hierarchy by
+ default
+
+Use unified cgroup hierarchy by default, making cgroup v2 the default
+cgroup version mounted at /sys/fs/cgroup.
+
+Signed-off-by: Stefan Agner <stefan@agner.ch>
+---
+ package/systemd/systemd.mk | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/package/systemd/systemd.mk b/package/systemd/systemd.mk
+index 41332f207a..d66550b852 100644
+--- a/package/systemd/systemd.mk
++++ b/package/systemd/systemd.mk
+@@ -24,7 +24,7 @@ SYSTEMD_SELINUX_MODULES = systemd udev
+ SYSTEMD_PROVIDES = udev
+ 
+ SYSTEMD_CONF_OPTS += \
+-	-Ddefault-hierarchy=hybrid \
++	-Ddefault-hierarchy=unified \
+ 	-Didn=true \
+ 	-Dima=false \
+ 	-Dkexec-path=/usr/sbin/kexec \
+-- 
+2.31.1
+
