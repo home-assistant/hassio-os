@@ -1,0 +1,86 @@
+[
+  {
+    "id": "ova",
+    "defconfig": "ova",
+    "runner": "x86-64-runner",
+    "label": "board/ova"
+  },
+  {
+    "id": "generic-x86-64",
+    "defconfig": "generic_x86_64",
+    "runner": "x86-64-runner",
+    "label": "board/generic-x86-64"
+  },
+  {
+    "id": "odroid-c2",
+    "defconfig": "odroid_c2",
+    "runner": "aarch64-runner",
+    "label": "board/odroid"
+  },
+  {
+    "id": "odroid-c4",
+    "defconfig": "odroid_c4",
+    "runner": "aarch64-runner",
+    "label": "board/odroid"
+  },
+  {
+    "id": "odroid-n2",
+    "defconfig": "odroid_n2",
+    "runner": "aarch64-runner",
+    "label": "board/odroid"
+  },
+  {
+    "id": "odroid-xu4",
+    "defconfig": "odroid_xu4",
+    "runner": "aarch64-runner",
+    "label": "board/odroid"
+  },
+  {
+    "id": "rpi",
+    "defconfig": "rpi",
+    "runner": "arm-runner",
+    "label": "board/raspberrypi"
+  },
+  {
+    "id": "rpi0-w",
+    "defconfig": "rpi0_w",
+    "runner": "arm-runner",
+    "label": "board/raspberrypi"
+  },
+  {
+    "id": "rpi2",
+    "defconfig": "rpi2",
+    "runner": "arm-runner",
+    "label": "board/raspberrypi"
+  },
+  {
+    "id": "rpi3",
+    "defconfig": "rpi3",
+    "runner": "arm-runner",
+    "label": "board/raspberrypi"
+  },
+  {
+    "id": "rpi3-64",
+    "defconfig": "rpi3_64",
+    "runner": "aarch64-runner",
+    "label": "board/raspberrypi"
+  },
+  {
+    "id": "rpi4",
+    "defconfig": "rpi4",
+    "runner": "arm-runner",
+    "label": "board/raspberrypi"
+  },
+  {
+    "id": "rpi4-64",
+    "defconfig": "rpi4_64",
+    "runner": "aarch64-runner",
+    "label": "board/raspberrypi"
+  },
+  {
+    "id": "tinker",
+    "defconfig": "tinker",
+    "runner": "arm-runner",
+    "label": "board/tinker"
+  }
+]
