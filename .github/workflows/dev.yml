@@ -4,15 +4,18 @@ name: Development build
 
 on:
   workflow_dispatch:
+  pull_request_target:
+    types: [opened,synchronize,labeled]
 
 jobs:
-  version:
-
-    name: Generate version
+  prepare:
+    if: ${{ github.event_name == 'workflow_dispatch' || contains(github.event.pull_request.labels.*.name, 'run-dev-build') }}
+    name: Prepare build
     runs-on: [ "ubuntu-20.04" ]
     outputs:
       version_main: ${{ steps.version_main.outputs.version_main }}
-      version_dev: ${{ steps.version_dev.outputs.version_dev }}
+      version_dev: ${{ steps.version_dev.outputs.version_dev }}${{ steps.version_pr.outputs.version_pr }}
+      matrix: ${{ steps.generate_matrix.outputs.result }}
     steps:
       - name: Generate Development build version
         shell: bash
@@ -21,6 +24,14 @@ jobs:
           version_dev="dev$(date --utc +'%Y%m%d')"
           echo "Development version \"${version_dev}\""
           echo "::set-output name=version_dev::${version_dev}"
+      - name: Generate Development build version for PR
+        if: ${{ github.event.pull_request }}
+        shell: bash
+        id: version_pr
+        run: |
+          version_pr=$(printf "%05d" ${{ github.event.pull_request.number }})
+          echo "Development build for PR #${{ github.event.pull_request.number }}"
+          echo "::set-output name=version_pr::${version_pr}"
       - uses: actions/checkout@v2
       - name: Get Major/Minor version
         id: version_main
@@ -28,35 +39,50 @@ jobs:
           major=$(cat ${GITHUB_WORKSPACE}/buildroot-external/meta | grep VERSION_MAJOR | cut -d'=' -f2)
           build=$(cat ${GITHUB_WORKSPACE}/buildroot-external/meta | grep VERSION_BUILD | cut -d'=' -f2)
           echo "::set-output name=version_main::${major}.${build}"
+      - name: Create build matrix
+        uses: actions/github-script@v4
+        id: generate_matrix
+        with:
+          script: |
+            const boards = require('./.github/workflows/matrix.json')
+
+            if (context.eventName == "workflow_dispatch") {
+              console.log("Run full build for all boards")
+              return { "board": boards }
+            }
+
+            const labels = context.payload.pull_request.labels.map(l => l.name)
+            const labelsSet = new Set(labels)
+            const buildBoards = boards.filter(b => labelsSet.has(b.label))
+
+            return { "board": buildBoards }
 
   build:
-    name: Release build for ${{ matrix.board.name }}
-    needs: version
+    if: ${{ github.event_name == 'workflow_dispatch' || contains(github.event.pull_request.labels.*.name, 'run-dev-build') }}
+    name: Development build for ${{ matrix.board.id }}
+    environment: "dev_build"
+    needs: prepare
     strategy:
       fail-fast: false
-      matrix:
-        board:
-          - {"name": "ova", "output": "ova", "runner": "x86-64-runner"}
-          - {"name": "generic_x86_64", "output": "generic-x86-64", "runner": "x86-64-runner"}
-          - {"name": "odroid_c2", "output": "odroid-c2", "runner": "aarch64-runner"}
-          - {"name": "odroid_c4", "output": "odroid-c4", "runner": "aarch64-runner"}
-          - {"name": "odroid_n2", "output": "odroid-n2", "runner": "aarch64-runner"}
-          - {"name": "odroid_xu4", "output": "odroid-xu4" , "runner": "aarch64-runner"}
-          - {"name": "rpi", "output": "rpi", "runner": "arm-runner"}
-          - {"name": "rpi0_w", "output": "rpi0-w", "runner": "arm-runner"}
-          - {"name": "rpi2", "output": "rpi2", "runner": "arm-runner"}
-          - {"name": "rpi3", "output": "rpi3", "runner": "arm-runner"}
-          - {"name": "rpi3_64", "output": "rpi3-64", "runner": "aarch64-runner"}
-          - {"name": "rpi4", "output": "rpi4", "runner": "arm-runner"}
-          - {"name": "rpi4_64", "output": "rpi4-64", "runner": "aarch64-runner"}
-          - {"name": "tinker", "output": "tinker", "runner": "arm-runner"}
+      matrix: ${{ fromJson(needs.prepare.outputs.matrix) }}
     runs-on: ${{ matrix.board.runner }}
 
     steps:
-      # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
-      - uses: actions/checkout@v2
+      - name: Define git reference
+        uses: actions/github-script@v4
+        id: generate_gitref
+        with:
+          script: |
+            if (context.eventName == "workflow_dispatch")
+              return { "ref": context.ref }
+            return { "ref": context.payload.pull_request.head.sha }
+
+      - name: Checkout source
+        uses: actions/checkout@v2
         with:
           submodules: true
+          persist-credentials: false
+          ref: ${{ fromJSON(steps.generate_gitref.outputs.result).ref }}
 
       - name: Build container
         run: docker build -t haos-builder .
@@ -76,7 +102,7 @@ jobs:
           docker run --rm --privileged -v "${GITHUB_WORKSPACE}:/build" \
             -e BUILDER_UID="${BUILDER_UID}" -e BUILDER_GID="${BUILDER_GID}" \
             -v "${{ matrix.board.runner }}-build-cache:/cache" \
-            haos-builder make BUILDDIR=/build VERSION_DEV=${{ needs.version.outputs.version_dev }} ${{ matrix.board.name }}
+            haos-builder make BUILDDIR=/build VERSION_DEV=${{ needs.prepare.outputs.version_dev }} ${{ matrix.board.defconfig }}
 
       - name: Upload images
         uses: burnett01/rsync-deployments@4.1
@@ -84,15 +110,16 @@ jobs:
           rsh: -q
           switches: -aW --ignore-existing
           path: release/
-          remote_path: ${{ secrets.DEV_TARGET_PATH }}/${{ needs.version.outputs.version_main }}.${{ needs.version.outputs.version_dev }}/
+          remote_path: ${{ secrets.DEV_TARGET_PATH }}/${{ needs.prepare.outputs.version_main }}.${{ needs.prepare.outputs.version_dev }}/
           remote_host: ${{ secrets.DEV_HOST }}
           remote_port: ${{ secrets.DEV_PORT }}
           remote_user: ${{ secrets.DEV_USERNAME }}
           remote_key: ${{ secrets.DEV_SSH_KEY }}
 
   bump_version:
-    name: Bump dev version to ${{ needs.version.outputs.version_main }}.${{ needs.version.outputs.version_dev }}
-    needs: [ build, version ]
+    name: Bump dev channel version
+    if: ${{ github.event_name == 'workflow_dispatch' }}
+    needs: [ build, prepare ]
     runs-on: [ "ubuntu-20.04" ]
 
     steps:
@@ -103,10 +130,10 @@ jobs:
         email: ${{ secrets.GIT_EMAIL }}
         token: ${{ secrets.GIT_TOKEN }}
 
-    - name: Bump Home Assistant OS dev version
+    - name: Bump Home Assistant OS dev channel version to ${{ needs.prepare.outputs.version_main }}.${{ needs.prepare.outputs.version_dev }}
       uses: home-assistant/actions/helpers/version-push@master
       with:
         key: "hassos[]"
         key-description: "Home Assistant OS"
-        version: ${{ needs.version.outputs.version_main }}.${{ needs.version.outputs.version_dev }}
+        version: ${{ needs.prepare.outputs.version_main }}.${{ needs.prepare.outputs.version_dev }}
         channel: "dev"
